@@ -7,14 +7,11 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev":   "vercel dev",
-    "build": "vercel build",
-    "deploy": "vercel --prod"
+    "dev": "node --watch api/createFleet.js",
+    "build": "echo 'AP3X static build — no bundler required at root'"
   },
   "dependencies": {},
-  "devDependencies": {
-    "vercel": "^34.0.0"
-  },
+  "devDependencies": {},
   "license": "UNLICENSED",
   "private": true
 }
