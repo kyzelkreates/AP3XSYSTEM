@@ -1,4 +1,4 @@
-// AP3X AI Master Controller — SSOT (RUN 11 FINAL)
+// AP3X AI Master Controller — SSOT (FINAL)
 // Single Source of Truth. No direct mutation from outside this module.
 // All state mutations must go through entity managers and emit events.
 //
@@ -9,8 +9,9 @@
 // RUN 6:  hazards, hazardBroadcasts
 // RUN 7:  tileJobs (IndexedDB holds tile blobs — SSOT holds job refs only)
 // RUN 8:  tacho (tachograph sessions + compliance ledger)
-// RUN 10: syncQueue, syncConflicts (sync engine audit refs only)
-// RUN 11: observability is READ-ONLY from store.events — no new keys needed
+// RUN 10: syncQueue, syncConflicts
+// RUN 11: observability is READ-ONLY from store.events
+// RUN 12: bundles (deployment build packager)
 
 export const store = {
   // RUN 1
@@ -42,12 +43,17 @@ export const store = {
   // RUN 8
   tacho:            {},
 
-  // RUN 10 — audit refs; live queue lives in SyncQueue adapter
+  // RUN 10
   syncQueue:        {},
   syncConflicts:    {},
 
+  // RUN 12 — deployment bundle snapshots
+  bundles:          {},
+
+  // Internal — deploy lock map (not persisted, runtime only)
+  _deployLocks:     {},
+
   // System — all events flow here from event-emitter.js
-  // RUN 11 observability reads this array — never writes to it
   events: []
 };
 
