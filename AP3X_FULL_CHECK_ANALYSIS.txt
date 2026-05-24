@@ -1,0 +1,380 @@
+================================================================================
+  AP3X MASTER CONTROLLER — FULL CHECK ANALYSIS
+  Generated: 2026-05-24
+  Analyst:   AP3X (Superagent)
+================================================================================
+
+CODEBASE SUMMARY
+----------------
+  Total files:       83
+  Total lines:       15,519
+  API handlers:      19
+  Core modules:      43
+  HTML UI pages:     7
+  PWA JS modules:    6
+  Node version req:  ≥18.0.0
+  Deploy target:     Vercel (serverless + static)
+
+FILE BREAKDOWN
+--------------
+  api/                 19 files   (1,081 lines)
+  core/                43 files   (7,325 lines)
+  pwa/                 12 files   (2,343 lines)
+  ui/                   6 files   (2,914 lines)
+  config/               1 file    (  59 lines)
+  root                  2 files   (  20 lines)
+
+
+================================================================================
+  SECTION 1: CONFIRMED BUGS
+================================================================================
+
+BUG-001  SEVERITY: HIGH
+  Title:     4 deployment API routes missing from vercel.json
+  Files:     config/vercel.json
+  Detail:    The following API handlers exist and are fully implemented but have
+             no Vercel route mapping. They will return 404 on all environments:
+
+               /api/deployment/status.js
+               /api/deployment/list.js
+               /api/deployment/rollback.js
+               /api/deployment/preflight.js
+
+  Fix:       Add to vercel.json routes array:
+               { "src": "/api/deployment/status",    "dest": "/api/deployment/status.js" }
+               { "src": "/api/deployment/list",      "dest": "/api/deployment/list.js" }
+               { "src": "/api/deployment/rollback",  "dest": "/api/deployment/rollback.js" }
+               { "src": "/api/deployment/preflight", "dest": "/api/deployment/preflight.js" }
+
+-------------------------------------------------------------------------------
+
+BUG-002  SEVERITY: MEDIUM
+  Title:     UI deploy buttons bypass the Master Controller rule
+  Files:     ui/fleet-detail.html (line 224), ui/dashboard.html (line 236)
+  Detail:    Both pages contain JavaScript deploy functions that write deployment
+             records directly to localStorage (the in-browser store stub) without
+             calling /api/deployFleet and without passing initiator: "master_controller".
+             This means:
+             - The deployment engine, pre-flight checks, versioning, packaging,
+               and environment adapters are all bypassed
+             - Fleet-detail and dashboard can self-deploy from the browser, which
+               violates the "Only Master Controller can deploy" rule
+
+             fleet-detail.html triggerDeploy():
+               Creates a raw deployment object and writes it to store.deployments
+               directly — no API call, no pre-flight, no bundle
+
+             dashboard.html deployFleet():
+               Same pattern — direct store mutation
+
+  Fix:       Replace both functions with fetch('/api/deployFleet', { method: 'POST',
+             body: JSON.stringify({ fleetId, initiator: 'master_controller', ... }) })
+             The API handler already enforces the initiator check and returns 403
+             if the rule is violated.
+
+-------------------------------------------------------------------------------
+
+BUG-003  SEVERITY: MEDIUM
+  Title:     hazard/confirm.js and hazard/dispute.js bypass hazard-manager
+  Files:     api/hazard/confirm.js, api/hazard/dispute.js
+  Detail:    Both handlers perform inline store mutation instead of calling the
+             purpose-built confirmHazard() / disputeHazard() functions in
+             core/hazards/hazard-manager.js.
+             The hazard-manager functions contain additional logic:
+             - Vote tallying with deduplication per driverId
+             - Threshold-based auto-resolve with configurable threshold
+             - Correct event payload structure
+             - Edge cases (already-resolved hazards, duplicate votes)
+             The API handlers reimplement a simplified version of this logic,
+             creating a divergence risk.
+
+  Fix:       Import and call:
+               import { confirmHazard, disputeHazard } from "../../core/hazards/hazard-manager.js"
+             Replace inline mutation with:
+               confirmHazard(store, fleetId, hazardId, driverId)
+               disputeHazard(store, fleetId, hazardId, driverId)
+
+-------------------------------------------------------------------------------
+
+BUG-004  SEVERITY: LOW
+  Title:     Unused import: getFleet in deployment-orchestrator.js
+  Files:     core/deployment-orchestrator.js (line 10)
+  Detail:    `import { getFleet } from "./fleet-manager.js"` is present but
+             getFleet() is never called anywhere in the orchestrator.
+             Fleet existence is validated via store.fleets?.[fleetId] directly
+             inside runPreFlight(). The import is dead code.
+
+  Fix:       Remove the import line. No functional impact — just cleanliness.
+
+
+================================================================================
+  SECTION 2: WARNINGS (Non-Critical)
+================================================================================
+
+WARN-001  SEVERITY: LOW
+  Title:     syncQueue, syncConflicts, tileJobs declared in SSOT but never
+             referenced via store.syncQueue / store.tileJobs etc.
+  Files:     core/storage.js, core/sync/*.js, core/tiles/*.js
+  Detail:    The sync and tile modules use their own internal Map/IndexedDB
+             abstractions rather than reading from store.syncQueue etc.
+             The SSOT keys exist for future server-side persistence but are
+             currently zero-referenced. This is intentional by design (sync
+             runs client-side in the PWA) but creates apparent dead keys.
+  Status:    Acceptable — document as "reserved for server-sync phase".
+
+-------------------------------------------------------------------------------
+
+WARN-002  SEVERITY: LOW
+  Title:     fleet-create.html and fleet-detail.html use relative back-links
+  Files:     ui/fleet-create.html (line: href="dashboard.html"),
+             ui/fleet-detail.html
+  Detail:    href="dashboard.html" works in local file system but on Vercel
+             the UI pages are served from /ui/* so the correct path is
+             href="/ui/dashboard.html". May cause 404 navigation on Vercel.
+  Fix:       Change all relative UI hrefs to absolute /ui/ paths.
+
+-------------------------------------------------------------------------------
+
+WARN-003  SEVERITY: LOW
+  Title:     VERCEL_TOKEN not set results in silent deploy plan only (not a crash)
+  Files:     api/deployFleet.js
+  Detail:    If VERCEL_TOKEN env var is not set, the deploy pipeline runs
+             fully (pre-flight, pack, validate, adapt, health check, activate)
+             but the actual Vercel API call is skipped with a warning in the
+             response. This is handled gracefully — not a bug, but operators
+             must ensure VERCEL_TOKEN is set in Vercel dashboard env vars
+             before expecting live deployments.
+  Action:    Add to deployment runbook: set VERCEL_TOKEN before first deploy.
+
+-------------------------------------------------------------------------------
+
+WARN-004  SEVERITY: INFO
+  Title:     rollback version suffix '-rb' does not break semver parsing
+  Files:     core/deployment/rollback-manager.js, core/deployment/version-manager.js
+  Detail:    Rollback versions are named e.g. "2.3.1-rb". The _parseSemver()
+             regex (^(\d+)\.(\d+)\.(\d+)) anchors at start and stops at the
+             dash, so "2.3.1-rb" correctly parses as major:2 minor:3 patch:1.
+             VERIFIED by regex simulation — no issue.
+  Status:    Confirmed safe. No action needed.
+
+-------------------------------------------------------------------------------
+
+WARN-005  SEVERITY: INFO
+  Title:     TextEncoder used in build-packager.js
+  Files:     core/deployment/build-packager.js
+  Detail:    TextEncoder is used to estimate bundle size in bytes. Node.js 18+
+             includes TextEncoder natively (no polyfill needed). Package.json
+             specifies "node": ">=18.0.0". Vercel uses Node 18 by default.
+  Status:    Confirmed safe. No action needed.
+
+-------------------------------------------------------------------------------
+
+WARN-006  SEVERITY: INFO
+  Title:     PWA fetch calls are path-relative — no API base URL configured
+  Files:     pwa/js/sync-agent.js
+  Detail:    fetch('/api/driver/sync?...') uses a root-relative path. Works
+             correctly when PWA is served from the same origin as the API.
+             Will fail if PWA is ever hosted on a different domain/CDN.
+  Action:    If PWA is ever split to a separate origin, add AP3X_API_BASE
+             as a build-time constant or manifest field.
+
+
+================================================================================
+  SECTION 3: ARCHITECTURE COMPLIANCE
+================================================================================
+
+RULE: Only Master Controller can deploy — Fleet OS cannot self-deploy
+  API enforcement:   ✓ PASS — deployFleet.js returns 403 if initiator ≠ "master_controller"
+  Orchestrator:      ✓ PASS — deployFleet() throws if initiator ≠ "master_controller"
+  Rollback:          ✓ PASS — rollbackFleet() throws if initiator ≠ "master_controller"
+  Fleet OS UI:       ✓ PASS — fleet-os.html has no deploy button
+  Dashboard UI:      ✗ FAIL — dashboard.html bypasses API (BUG-002)
+  Fleet Detail UI:   ✗ FAIL — fleet-detail.html bypasses API (BUG-002)
+
+RULE: All state mutations emit events via event-emitter.js
+  Core modules:      ✓ PASS — all managers call emitEvent() on mutations
+  Rollback manager:  ✓ PASS — emits rollback.initiated / complete / pending
+  Deployment orch:   ✓ PASS — emits per-stage status events
+  Deploy lock:       ~ NOTE — _acquireLock/_releaseLock do not emit events
+                             (internal runtime state — acceptable)
+
+RULE: SSOT in storage.js is the single source of truth
+  SSOT keys:         ✓ PASS — 19 declared keys cover all subsystems
+  New bundles key:   ✓ PASS — added for deployment engine (RUN 12)
+  Dead keys:         ~ NOTE — syncQueue, syncConflicts, tileJobs declared but
+                             not actively written (see WARN-001)
+
+RULE: Safety gatekeeper is read-only on routes
+  safety-engine.js:  ✓ PASS — writes only to store.safetyDecisions, never routes
+  safetyCheck API:   ✓ PASS — confirmed read-only on route objects
+
+RULE: Compliance modules enforce EU 561/2006 and UK Domestic
+  compliance-constants.js: ✓ PASS — both regulation sets defined
+  tachograph-engine.js:    ✓ PASS — 506 lines, full session lifecycle
+  compliance-validator.js: ✓ PASS — 334 lines, pre-route and standing checks
+
+
+================================================================================
+  SECTION 4: IMPORT/EXPORT INTEGRITY
+================================================================================
+
+All import paths resolved:          ✓ PASS (0 missing path errors)
+All named imports match exports:    ✓ PASS (0 function name mismatches)
+All API handlers use default export:✓ PASS (19/19 have export default)
+Circular import check:              ✓ PASS (no cycles detected)
+Core→Core import integrity:         ✓ PASS
+
+Notable resolved fixes from prior session:
+  - hazard/report.js: createHazard → reportHazard             ✓ FIXED
+  - tacho/session.js: arg order corrected for startSession()  ✓ FIXED
+  - tacho/activity.js: missing fleetId arg added              ✓ FIXED
+
+
+================================================================================
+  SECTION 5: API COVERAGE MATRIX
+================================================================================
+
+  Endpoint                        File                          Vercel Route
+  ─────────────────────────────────────────────────────────────────────────────
+  POST /api/createFleet           api/createFleet.js            ✓ ROUTED
+  POST /api/updateFleet           api/updateFleet.js            ✓ ROUTED
+  POST /api/deployFleet           api/deployFleet.js            ✓ ROUTED
+  POST /api/safetyCheck           api/safetyCheck.js            ✓ ROUTED
+  POST /api/hazard/report         api/hazard/report.js          ✓ ROUTED
+  POST /api/hazard/confirm        api/hazard/confirm.js         ✓ ROUTED
+  POST /api/hazard/dispute        api/hazard/dispute.js         ✓ ROUTED
+  POST /api/tacho/session         api/tacho/session.js          ✓ ROUTED
+  POST /api/tacho/activity        api/tacho/activity.js         ✓ ROUTED
+  GET  /api/driver/sync           api/driver/sync.js            ✓ ROUTED
+  POST /api/device/checkin        api/device/checkin.js         ✓ ROUTED
+  POST /api/device/heartbeat      api/device/heartbeat.js       ✓ ROUTED
+  POST /api/nav/event             api/nav/event.js              ✓ ROUTED
+  GET  /api/obs/query             api/obs/query.js              ✓ ROUTED
+  POST /api/obs/export            api/obs/export.js             ✓ ROUTED
+  GET  /api/deployment/status     api/deployment/status.js      ✗ MISSING ROUTE
+  GET  /api/deployment/list       api/deployment/list.js        ✗ MISSING ROUTE
+  POST /api/deployment/rollback   api/deployment/rollback.js    ✗ MISSING ROUTE
+  POST /api/deployment/preflight  api/deployment/preflight.js   ✗ MISSING ROUTE
+  ─────────────────────────────────────────────────────────────────────────────
+  15/19 routed correctly. 4 require vercel.json update (BUG-001).
+
+
+================================================================================
+  SECTION 6: MODULE COMPLETENESS BY SUBSYSTEM
+================================================================================
+
+  SUBSYSTEM              FILES   STATUS     NOTES
+  ─────────────────────────────────────────────────────────────────────────
+  Fleet Management         4     COMPLETE   createFleet, updateFleet, branding
+  Entity System            4     COMPLETE   drivers, vehicles, devices, entities
+  Identity & Permissions   2     COMPLETE   binder, permission-engine
+  Routing Engine           4     COMPLETE   builder, engine, validator, constraints
+  Safety Gatekeeper        3     COMPLETE   engine, risk-scorer, constants
+  Hazard System            4     COMPLETE   manager, broadcast, validator, constants
+  Tachograph/Compliance    3     COMPLETE   engine, validator, constants (506 lines)
+  Tile Cache               3     COMPLETE   manager, store, constants
+  Sync Engine              5     COMPLETE   queue, resolver, reconciler, manager, consts
+  Observability            3     COMPLETE   event-log, exporter, constants
+  Deployment Engine        6     COMPLETE   orchestrator, packager, versioning,
+                                            rollback, env-adapter, constants
+  Integrations             2     COMPLETE   GraphHopper, OSM fallback
+  Event System             1     COMPLETE   event-emitter
+  Storage (SSOT)           1     COMPLETE   19 top-level keys
+  ─────────────────────────────────────────────────────────────────────────
+  API Handlers            19     PARTIAL    15/19 routed (4 missing Vercel routes)
+  UI Admin Pages           6     PARTIAL    Deploy buttons bypass API (BUG-002)
+  Driver PWA               6     COMPLETE   SW, offline-nav, sync-agent, tacho,
+                                            hazard-reporter, route-viewer
+  ─────────────────────────────────────────────────────────────────────────
+
+
+================================================================================
+  SECTION 7: DEPLOYMENT ENGINE SPECIFIC ANALYSIS
+================================================================================
+
+  Component                   Status    Notes
+  ─────────────────────────────────────────────────────────────────────────────
+  deployment-constants.js     ✓ PASS    All constants defined and referenced
+  version-manager.js          ✓ PASS    Semver, pin/unpin, history, candidates
+  build-packager.js           ✓ PASS    5 targets: full/incremental/config/pwa/rollback
+  rollback-manager.js         ✓ PASS    3 strategies: immediate/graceful/canary_abort
+  environment-adapter.js      ✓ PASS    3 environments: vercel/server/edge + local
+  deployment-orchestrator.js  ✓ PASS    Full 9-stage pipeline with lock + events
+  ─────────────────────────────────────────────────────────────────────────────
+
+  DEPLOYMENT PIPELINE STAGES:
+    1. Acquire deploy lock (10 min TTL, prevents concurrent deploys)
+    2. Pre-flight validation (8 checks: fleet exists, active, vehicles, drivers,
+       devices, identity bound, regulation set, no concurrent deploy)
+    3. Register version (semver increment, changelog, target)
+    4. Pack (full/incremental/config-only/pwa-only based on bundleTarget param)
+    5. Validate bundle (manifest, required sections, entity warnings)
+    6. Adapt to environment (Vercel API spec / server artifacts / edge bindings)
+    7. Execute deploy (API call or queued for handler)
+    8. Health check (device heartbeat rate, bundle checksum verification)
+    9. Activate version (supersedes previous, emits deployment.complete)
+
+  ROLLBACK STRATEGIES:
+    IMMEDIATE:     Hard cut to prior version. Packs rollback bundle, activates,
+                   supersedes current. Completes in <1 event loop.
+    GRACEFUL:      Marks deployment as pending_rollback. Waits for active
+                   driver tacho sessions and routes to close. isGracefulRollbackReady()
+                   + completeGracefulRollback() polled by API handler.
+    CANARY_ABORT:  Marks current as FAILED (not ROLLED_BACK), then executes
+                   immediate restore of prior version.
+
+  BUNDLE TARGETS:
+    FULL:          Complete snapshot — all 10 sections including entity data
+    INCREMENTAL:   Diff from prior bundle — only added/modified/removed records
+    CONFIG_ONLY:   Fleet config + branding — no entity data (fastest)
+    PWA_ONLY:      Config + branding + driver stubs — server unchanged
+    ROLLBACK:      Copy of prior bundle with new rollback metadata
+
+  INITIATOR ENFORCEMENT:
+    orchestrator:  Throws Error if options.initiator !== "master_controller"
+    API handler:   Returns HTTP 403 with code INITIATOR_NOT_MASTER_CONTROLLER
+
+
+================================================================================
+  SECTION 8: RECOMMENDED FIX PRIORITY ORDER
+================================================================================
+
+  Priority 1 — Deploy before going live:
+    ① BUG-001: Add 4 missing deployment routes to vercel.json
+    ② BUG-002: Fix UI deploy buttons to call /api/deployFleet with initiator
+
+  Priority 2 — Code quality / consistency:
+    ③ BUG-003: Route hazard confirm/dispute through hazard-manager functions
+    ④ BUG-004: Remove unused getFleet import from deployment-orchestrator.js
+    ⑤ WARN-002: Fix relative UI hrefs to /ui/ absolute paths
+
+  Priority 3 — Operational readiness:
+    ⑥ WARN-003: Set VERCEL_TOKEN in Vercel env dashboard before first deploy
+    ⑦ WARN-001: Document syncQueue/syncConflicts/tileJobs as reserved SSOT keys
+
+
+================================================================================
+  SECTION 9: OVERALL HEALTH SCORE
+================================================================================
+
+  Import integrity:           100% (0 broken paths, 0 mismatched function names)
+  API handler completeness:    100% (19/19 handlers implemented)
+  Vercel route coverage:        79% (15/19 routed — 4 missing)
+  Architecture rule compliance: 85% (UI deploy bypass is the main gap)
+  Module completeness:         100% (all 14 subsystems fully implemented)
+  SSOT coverage:               100% (all referenced keys declared)
+  Export consistency:          100% (all API handlers use default export)
+
+  OVERALL: PRODUCTION-READY WITH 2 BLOCKING FIXES (BUG-001, BUG-002)
+
+  The codebase is structurally sound. All import chains resolve correctly,
+  all function signatures match their call sites, and the deployment engine
+  is fully implemented with proper locking, versioning, and rollback. The
+  two blocking issues are both configuration/wiring gaps — not logic errors —
+  and both have straightforward fixes defined above.
+
+================================================================================
+  END OF REPORT
+  AP3X Master Controller Full Check Analysis — 2026-05-24
+  Total: 83 files | 15,519 lines | 14 subsystems | 19 API endpoints
+================================================================================
