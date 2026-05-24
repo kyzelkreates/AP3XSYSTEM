@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AP3X — Fleet Detail</title>
+  <style>
+    :root {
+      --purple: #7C3AED;
+      --dark: #0F0F1A;
+      --card: #1A1A2E;
+      --border: #2E2E4A;
+      --text: #E2E8F0;
+      --muted: #94A3B8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--dark); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 2rem; border-bottom: 1px solid var(--border); background: var(--card);
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: var(--purple); letter-spacing: 2px; }
+    .back { font-size: 0.85rem; color: var(--muted); cursor: pointer; text-decoration: none; }
+    .back:hover { color: var(--text); }
+    main { padding: 2rem; max-width: 800px; margin: 0 auto; }
+    .section-title {
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px;
+      color: var(--muted); margin-bottom: 1rem;
+    }
+    .detail-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .fleet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; }
+    .fleet-title { font-size: 1.4rem; font-weight: 700; }
+    .fleet-id { font-size: 0.75rem; color: var(--muted); font-family: monospace; margin-top: 0.3rem; }
+    .badge { font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 1px; }
+    .badge-active { background: #14532D; color: #4ADE80; }
+    .badge-deploying { background: #1E3A5F; color: #60A5FA; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .meta-item .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.25rem; }
+    .meta-item .val { font-size: 0.9rem; }
+    .brand-preview {
+      display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem;
+    }
+    .swatch { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); }
+    .brand-label { font-size: 0.82rem; color: var(--muted); }
+    .btn {
+      padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; border: none; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--purple); color: #fff; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+    .deployment-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .dep-row {
+      background: #0F0F1A; border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.82rem;
+    }
+    .dep-id { font-family: monospace; color: var(--muted); }
+    .dep-version { color: var(--purple); font-weight: 600; }
+    #event-log {
+      background: #0F0F1A; border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.75rem 1rem; max-height: 180px; overflow-y: auto;
+      font-size: 0.78rem; font-family: monospace; color: var(--muted);
+    }
+    .event-entry { padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+    .event-entry:last-child { border-bottom: none; }
+    .event-type { color: var(--purple); font-weight: 600; }
+    .empty { color: var(--muted); font-size: 0.82rem; }
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--purple);
+      color: #fff; padding: 0.7rem 1.2rem; border-radius: 10px; font-size: 0.85rem;
+      font-weight: 600; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Brand editor */
+    .brand-editor { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 1.25rem; display: none; }
+    .brand-editor label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 0.3rem; margin-top: 0.75rem; }
+    .brand-editor input { width: 100%; background: #0F0F1A; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 0.55rem 0.8rem; font-size: 0.85rem; outline: none; }
+    .brand-editor input:focus { border-color: var(--purple); }
+    .color-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .brand-editor input[type="color"] { height: 2.2rem; padding: 0.1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>⬡ AP3X</h1>
+  <a class="back" href="dashboard.html">← Back to Dashboard</a>
+</header>
+<main>
+  <p class="section-title">Fleet Detail</p>
+
+  <div class="detail-card" id="fleet-card">
+    <div class="fleet-header">
+      <div>
+        <div class="fleet-title" id="fleet-name">—</div>
+        <div class="fleet-id" id="fleet-id">—</div>
+      </div>
+      <span class="badge badge-active" id="fleet-status">active</span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="label">Created</div>
+        <div class="val" id="fleet-created">—</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Vehicles</div>
+        <div class="val" id="fleet-vehicles">0</div>
+      </div>
+    </div>
+
+    <div class="brand-preview" id="brand-preview" style="display:none;">
+      <div class="swatch" id="swatch-primary"></div>
+      <div class="swatch" id="swatch-secondary"></div>
+      <div class="brand-label" id="brand-label">Brand configured</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="triggerDeploy()">🚀 Deploy Fleet</button>
+      <button class="btn btn-outline" onclick="toggleBrandEditor()">🎨 Edit Brand</button>
+    </div>
+
+    <!-- Brand editor -->
+    <div class="brand-editor" id="brand-editor">
+      <label>Logo URL</label>
+      <input type="text" id="edit-logo" placeholder="https://..." />
+      <div class="color-row">
+        <div>
+          <label>Primary</label>
+          <input type="color" id="edit-primary" value="#7C3AED" />
+        </div>
+        <div>
+          <label>Secondary</label>
+          <input type="color" id="edit-secondary" value="#1E1E2E" />
+        </div>
+      </div>
+      <div class="actions" style="margin-top:0.75rem;">
+        <button class="btn btn-primary" onclick="saveBrand()">Save Brand</button>
+        <button class="btn btn-outline" onclick="toggleBrandEditor()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Deployments</p>
+  <div class="detail-card">
+    <div class="deployment-list" id="deployment-list">
+      <p class="empty">No deployments yet.</p>
+    </div>
+  </div>
+
+  <p class="section-title">Fleet Events</p>
+  <div id="event-log"><span class="empty">No events for this fleet.</span></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const fleetId = params.get("id");
+
+  function loadStore() {
+    return JSON.parse(localStorage.getItem("ap3x_store") || '{"fleets":{},"fleetBrands":{},"deployments":{},"events":[]}');
+  }
+  function saveStore(store) { localStorage.setItem("ap3x_store", JSON.stringify(store)); }
+
+  function emitEvent(store, event) {
+    const enriched = { id: crypto.randomUUID(), timestamp: Date.now(), status: "pending", ...event };
+    store.events.push(enriched);
+    return enriched;
+  }
+
+  function render() {
+    const store = loadStore();
+    const fleet = store.fleets[fleetId];
+    if (!fleet) { document.getElementById("fleet-name").textContent = "Fleet not found"; return; }
+
+    document.title = `AP3X — ${fleet.name}`;
+    document.getElementById("fleet-name").textContent = fleet.name;
+    document.getElementById("fleet-id").textContent = `ID: ${fleet.id}`;
+    document.getElementById("fleet-created").textContent = new Date(fleet.createdAt).toLocaleString();
+    document.getElementById("fleet-vehicles").textContent = fleet.config.vehicles.length;
+    document.getElementById("fleet-status").textContent = fleet.status;
+
+    const brand = store.fleetBrands[fleetId];
+    if (brand) {
+      document.getElementById("brand-preview").style.display = "flex";
+      document.getElementById("swatch-primary").style.background = brand.primaryColor;
+      document.getElementById("swatch-secondary").style.background = brand.secondaryColor;
+      document.getElementById("brand-label").textContent = brand.logo ? `Logo + ${brand.primaryColor}` : brand.primaryColor;
+      document.getElementById("edit-primary").value = brand.primaryColor;
+      document.getElementById("edit-secondary").value = brand.secondaryColor;
+      document.getElementById("edit-logo").value = brand.logo || "";
+    }
+
+    const deps = Object.values(store.deployments).filter(d => d.fleetId === fleetId).sort((a,b) => b.createdAt - a.createdAt);
+    const depList = document.getElementById("deployment-list");
+    depList.innerHTML = deps.length
+      ? deps.map(d => `
+          <div class="dep-row">
+            <span class="dep-id">ID: ${d.id.slice(0,8)}…</span>
+            <span class="dep-version">v${d.version}</span>
+            <span class="badge badge-deploying">${d.status}</span>
+          </div>
+        `).join("")
+      : '<p class="empty">No deployments yet.</p>';
+
+    const fleetEvents = store.events.filter(e => e.fleetId === fleetId).reverse().slice(0, 30);
+    const log = document.getElementById("event-log");
+    log.innerHTML = fleetEvents.length
+      ? fleetEvents.map(e => `
+          <div class="event-entry">
+            <span class="event-type">${e.type}</span>
+            &nbsp;·&nbsp;${new Date(e.timestamp).toLocaleTimeString()}
+          </div>
+        `).join("")
+      : '<span class="empty">No events for this fleet.</span>';
+  }
+
+  function triggerDeploy() {
+    const store = loadStore();
+    const fleet = store.fleets[fleetId];
+    if (!fleet) return;
+    const deployment = {
+      id: crypto.randomUUID(), fleetId,
+      version: Date.now(), status: "deploying", createdAt: Date.now()
+    };
+    store.deployments[deployment.id] = deployment;
+    emitEvent(store, { type: "deployment.created", fleetId, payload: deployment });
+    saveStore(store);
+    render();
+    showToast("Deployment triggered");
+  }
+
+  function toggleBrandEditor() {
+    const ed = document.getElementById("brand-editor");
+    ed.style.display = ed.style.display === "none" || !ed.style.display ? "block" : "none";
+  }
+
+  function saveBrand() {
+    const store = loadStore();
+    const brand = {
+      logo: document.getElementById("edit-logo").value.trim() || null,
+      primaryColor: document.getElementById("edit-primary").value,
+      secondaryColor: document.getElementById("edit-secondary").value,
+      updatedAt: Date.now()
+    };
+    store.fleetBrands[fleetId] = brand;
+    emitEvent(store, { type: "fleet.brand.updated", fleetId, payload: brand });
+    saveStore(store);
+    toggleBrandEditor();
+    render();
+    showToast("Brand saved");
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2400);
+  }
+
+  render();
+</script>
+</body>
+</html>
