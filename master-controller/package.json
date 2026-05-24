@@ -1,0 +1,20 @@
+{
+  "name": "ap3x-master-controller",
+  "version": "1.0.0",
+  "description": "AP3X AI Master Controller — multi-fleet management control plane",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev":   "vercel dev",
+    "build": "vercel build",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^34.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
