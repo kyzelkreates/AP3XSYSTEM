@@ -1,4 +1,4 @@
-// AP3X AI Master Controller — SSOT (RUN 7 EXTENDED)
+// AP3X AI Master Controller — SSOT (RUN 8 EXTENDED)
 // Single Source of Truth. No direct mutation from outside this module.
 // All state mutations must go through entity managers and emit events.
 //
@@ -7,7 +7,8 @@
 // RUN 4: routes
 // RUN 5: safetyDecisions
 // RUN 6: hazards, hazardBroadcasts
-// RUN 7: tileJobs (IndexedDB is the tile store — SSOT holds job refs only)
+// RUN 7: tileJobs (IndexedDB holds tile blobs — SSOT holds job refs only)
+// RUN 8: tacho (tachograph sessions + compliance ledger)
 
 export const store = {
   // RUN 1
@@ -35,6 +36,9 @@ export const store = {
 
   // RUN 7 — job index only; tile blobs live in IndexedDB
   tileJobs:         {},
+
+  // RUN 8
+  tacho:            {},
 
   // System
   events: []
