@@ -1,41 +1,32 @@
 // AP3X API — POST /api/hazard/dispute
 // Driver disputes a hazard (reports it as gone / inaccurate).
-// Increments rejection count. Fleet admin resolves if rejections exceed threshold.
+// Routes through hazard-manager.disputeHazard() — single source of logic.
+//
+// Body: { hazardId, driverId, fleetId }
 
-import store       from "../../core/storage.js";
-import { emitEvent } from "../../core/event-emitter.js";
-
-const AUTO_RESOLVE_THRESHOLD = 3; // auto-resolve if 3+ rejections and 0 recent confirmations
+import { disputeHazard } from "../../core/hazards/hazard-manager.js";
+import store             from "../../core/storage.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { hazardId, driverId, fleetId } = req.body || {};
   if (!hazardId) return res.status(400).json({ error: "hazardId required" });
+  if (!driverId) return res.status(400).json({ error: "driverId required" });
+  if (!fleetId)  return res.status(400).json({ error: "fleetId required" });
 
-  const hazard = store.hazards[hazardId];
-  if (!hazard)  return res.status(404).json({ error: "Hazard not found" });
+  const hazard = store.hazards?.[hazardId];
+  if (!hazard)   return res.status(404).json({ error: `Hazard not found: ${hazardId}` });
 
-  const rejections    = (hazard.rejections || 0) + 1;
-  const confirmations = hazard.confirmations || 0;
-
-  // Auto-resolve: more rejections than confirmations and over threshold
-  const shouldResolve = rejections >= AUTO_RESOLVE_THRESHOLD && rejections > confirmations;
-
-  store.hazards[hazardId] = {
-    ...hazard,
-    rejections,
-    lastDisputedAt: Date.now(),
-    lastDisputedBy: driverId || null,
-    ...(shouldResolve ? { status: "resolved", resolvedAt: Date.now(), resolvedReason: "auto_dispute" } : {})
-  };
-
-  emitEvent(store, {
-    type:     shouldResolve ? "hazard.auto_resolved" : "hazard.disputed",
-    fleetId,
-    entityId: hazardId,
-    payload:  { hazardId, driverId, rejections, autoResolved: shouldResolve }
-  });
-
-  return res.status(200).json({ hazardId, rejections, autoResolved: shouldResolve });
+  try {
+    const updated = disputeHazard(store, fleetId, hazardId, driverId);
+    return res.status(200).json({
+      hazardId,
+      rejections:   updated.rejections,
+      status:       updated.status,
+      autoResolved: updated.status === "resolved"
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 }

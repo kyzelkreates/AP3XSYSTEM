@@ -6,31 +6,36 @@
     { "src": "pwa/**/*",     "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/api/createFleet",        "dest": "/api/createFleet.js" },
-    { "src": "/api/updateFleet",        "dest": "/api/updateFleet.js" },
-    { "src": "/api/deployFleet",        "dest": "/api/deployFleet.js" },
-    { "src": "/api/safetyCheck",        "dest": "/api/safetyCheck.js" },
+    { "src": "/api/createFleet",             "dest": "/api/createFleet.js" },
+    { "src": "/api/updateFleet",             "dest": "/api/updateFleet.js" },
+    { "src": "/api/deployFleet",             "dest": "/api/deployFleet.js" },
+    { "src": "/api/safetyCheck",             "dest": "/api/safetyCheck.js" },
 
-    { "src": "/api/hazard/report",      "dest": "/api/hazard/report.js" },
-    { "src": "/api/hazard/confirm",     "dest": "/api/hazard/confirm.js" },
-    { "src": "/api/hazard/dispute",     "dest": "/api/hazard/dispute.js" },
+    { "src": "/api/deployment/status",       "dest": "/api/deployment/status.js" },
+    { "src": "/api/deployment/list",         "dest": "/api/deployment/list.js" },
+    { "src": "/api/deployment/rollback",     "dest": "/api/deployment/rollback.js" },
+    { "src": "/api/deployment/preflight",    "dest": "/api/deployment/preflight.js" },
 
-    { "src": "/api/tacho/activity",     "dest": "/api/tacho/activity.js" },
-    { "src": "/api/tacho/session",      "dest": "/api/tacho/session.js" },
+    { "src": "/api/hazard/report",           "dest": "/api/hazard/report.js" },
+    { "src": "/api/hazard/confirm",          "dest": "/api/hazard/confirm.js" },
+    { "src": "/api/hazard/dispute",          "dest": "/api/hazard/dispute.js" },
 
-    { "src": "/api/driver/sync",        "dest": "/api/driver/sync.js" },
+    { "src": "/api/tacho/activity",          "dest": "/api/tacho/activity.js" },
+    { "src": "/api/tacho/session",           "dest": "/api/tacho/session.js" },
 
-    { "src": "/api/device/heartbeat",   "dest": "/api/device/heartbeat.js" },
-    { "src": "/api/device/checkin",     "dest": "/api/device/checkin.js" },
+    { "src": "/api/driver/sync",             "dest": "/api/driver/sync.js" },
 
-    { "src": "/api/nav/event",          "dest": "/api/nav/event.js" },
+    { "src": "/api/device/heartbeat",        "dest": "/api/device/heartbeat.js" },
+    { "src": "/api/device/checkin",          "dest": "/api/device/checkin.js" },
 
-    { "src": "/api/obs/query",          "dest": "/api/obs/query.js" },
-    { "src": "/api/obs/export",         "dest": "/api/obs/export.js" },
+    { "src": "/api/nav/event",               "dest": "/api/nav/event.js" },
 
-    { "src": "/ui/(.*)",                "dest": "/ui/$1" },
-    { "src": "/pwa/(.*)",               "dest": "/pwa/$1" },
-    { "src": "/",                       "dest": "/ui/dashboard.html" }
+    { "src": "/api/obs/query",               "dest": "/api/obs/query.js" },
+    { "src": "/api/obs/export",              "dest": "/api/obs/export.js" },
+
+    { "src": "/ui/(.*)",                     "dest": "/ui/$1" },
+    { "src": "/pwa/(.*)",                    "dest": "/pwa/$1" },
+    { "src": "/",                            "dest": "/ui/dashboard.html" }
   ],
   "headers": [
     {

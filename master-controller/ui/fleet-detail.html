@@ -89,7 +89,7 @@
 <body>
 <header>
   <h1>⬡ AP3X</h1>
-  <a class="back" href="dashboard.html">← Back to Dashboard</a>
+  <a class="back" href="/ui/dashboard.html">← Back to Dashboard</a>
 </header>
 <main>
   <p class="section-title">Fleet Detail</p>
@@ -221,19 +221,33 @@
       : '<span class="empty">No events for this fleet.</span>';
   }
 
-  function triggerDeploy() {
-    const store = loadStore();
-    const fleet = store.fleets[fleetId];
-    if (!fleet) return;
-    const deployment = {
-      id: crypto.randomUUID(), fleetId,
-      version: Date.now(), status: "deploying", createdAt: Date.now()
-    };
-    store.deployments[deployment.id] = deployment;
-    emitEvent(store, { type: "deployment.created", fleetId, payload: deployment });
-    saveStore(store);
-    render();
-    showToast("Deployment triggered");
+  async function triggerDeploy() {
+    // BUG-002 FIX: Route through /api/deployFleet — Master Controller enforces initiator rule
+    const btn = document.querySelector('[onclick="triggerDeploy()"]');
+    if (btn) { btn.disabled = true; btn.textContent = "Deploying…"; }
+    try {
+      const resp = await fetch("/api/deployFleet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fleetId,
+          initiator:    "master_controller",
+          env:          "vercel",
+          bundleTarget: "full",
+          bump:         "patch"
+        })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        showToast(`✓ Deployed v${result.version} — bundle ${result.bundleId?.slice(0,8)}`);
+      } else {
+        showToast(`✗ Deploy failed: ${(result.errors || [result.error]).join(", ")}`);
+      }
+    } catch (err) {
+      showToast(`✗ Deploy error: ${err.message}`);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "🚀 Deploy Fleet"; }
+    }
   }
 
   function toggleBrandEditor() {

@@ -7,7 +7,7 @@
 // Replaces the original 22-line stub (RUN 1).
 
 import { emitEvent }        from "./event-emitter.js";
-import { getFleet }         from "./fleet-manager.js";
+// fleet-manager.js — fleet existence validated via store.fleets in runPreFlight()
 import {
   DEPLOY_STATUS, DEPLOY_ENV, BUNDLE_TARGET,
   PRE_FLIGHT_CHECK, HEALTH, DEPLOY_LOCK_TTL_MS, VERSION

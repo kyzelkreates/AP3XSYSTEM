@@ -233,21 +233,33 @@
     return AP3X.store.fleets[fleetId];
   }
 
-  function deployFleet(fleetId) {
+  async function deployFleet(fleetId) {
+    // BUG-002 FIX: Route through /api/deployFleet — Master Controller enforces initiator rule
     const fleet = AP3X.store.fleets[fleetId];
     if (!fleet) return alert("Fleet not found");
-    const deployment = {
-      id: crypto.randomUUID(),
-      fleetId,
-      version: Date.now(),
-      status: "deploying",
-      createdAt: Date.now()
-    };
-    AP3X.store.deployments[deployment.id] = deployment;
-    emitEvent({ type: "deployment.created", fleetId, payload: deployment });
-    saveStore();
-    updateStats();
-    showToast(`Deployment triggered for ${fleet.name}`);
+    showToast(`Deploying ${fleet.name}…`);
+    try {
+      const resp = await fetch("/api/deployFleet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fleetId,
+          initiator:    "master_controller",
+          env:          "vercel",
+          bundleTarget: "full",
+          bump:         "patch"
+        })
+      });
+      const result = await resp.json();
+      if (result.success) {
+        showToast(`✓ ${fleet.name} deployed v${result.version}`);
+        updateStats();
+      } else {
+        showToast(`✗ Deploy failed: ${(result.errors || [result.error]).join(", ")}`);
+      }
+    } catch (err) {
+      showToast(`✗ Deploy error: ${err.message}`);
+    }
   }
 
   function renderFleets() {
