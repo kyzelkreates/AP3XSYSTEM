@@ -302,6 +302,8 @@
       #sidebar { display: none; }
     }
   </style>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
@@ -350,6 +352,15 @@
     <div class="nav-item" onclick="showView('events')" id="nav-events">
       <span class="icon">📡</span> Event Stream
       <span class="badge" id="badge-events">0</span>
+    </div>
+
+    <div class="nav-section">Dispatch</div>
+    <div class="nav-item" onclick="showView('jobs')" id="nav-jobs">
+      <span class="icon">📋</span> Jobs
+      <span class="badge" id="badge-jobs">0</span>
+    </div>
+    <div class="nav-item" onclick="showView('settings')" id="nav-settings">
+      <span class="icon">⚙️</span> Settings
     </div>
   </div>
 
@@ -531,6 +542,107 @@
           <span class="live"><span class="pulse-dot"></span>Read-Only · SSOT</span>
         </div>
         <div class="event-entries" id="event-full-entries" style="max-height:600px;"></div>
+      </div>
+    </div>
+
+
+    <!-- ── JOBS ─────────────────────────────────────────────── -->
+    <div class="view" id="view-jobs">
+      <div class="kpi-row" id="kpi-jobs"></div>
+
+      <!-- Assign Job form -->
+      <div class="table-wrap" style="padding:1rem 1.1rem;margin-bottom:1rem;">
+        <div class="sec-title" style="margin-bottom:0.75rem;">Assign Job to Driver</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0.6rem;align-items:end;">
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:0.3rem;">JOB</label>
+            <select id="assign-job-id" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;outline:none;cursor:pointer;">
+              <option value="">— Select job —</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:0.3rem;">DRIVER</label>
+            <select id="assign-driver-id" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;outline:none;cursor:pointer;">
+              <option value="">— Select driver —</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:0.3rem;">VEHICLE</label>
+            <select id="assign-vehicle-id" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;outline:none;cursor:pointer;">
+              <option value="">— Select vehicle —</option>
+            </select>
+          </div>
+          <button onclick="assignJob()" style="background:var(--purple);color:#fff;border:none;border-radius:6px;padding:0.45rem 1rem;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">Assign →</button>
+        </div>
+      </div>
+
+      <!-- Jobs table -->
+      <div class="sec-header">
+        <span class="sec-title">All Jobs</span>
+        <span class="sec-count" id="job-count">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Pickup</th>
+              <th>Dropoff</th>
+              <th>Status</th>
+              <th>Assigned Driver</th>
+              <th>Vehicle</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="job-table">
+            <tr class="empty-row"><td colspan="7">Loading jobs…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Assignments table -->
+      <div class="sec-header" style="margin-top:1rem;">
+        <span class="sec-title">Job Assignments</span>
+        <span class="sec-count" id="assignment-count">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Job Title</th>
+              <th>Driver</th>
+              <th>Vehicle</th>
+              <th>Status</th>
+              <th>Assigned At</th>
+            </tr>
+          </thead>
+          <tbody id="assignment-table">
+            <tr class="empty-row"><td colspan="5">No assignments yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ──────────────────────────────────────────── -->
+    <div class="view" id="view-settings">
+      <div class="sec-title" style="margin-bottom:1rem;">Supabase Connection</div>
+      <div class="table-wrap" style="padding:1.25rem 1.5rem;max-width:560px;">
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:0.35rem;">PROJECT URL</label>
+            <input id="sb-url" type="url" placeholder="https://xxxx.supabase.co"
+              style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;outline:none;font-family:monospace;">
+          </div>
+          <div>
+            <label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:0.35rem;">ANON KEY</label>
+            <input id="sb-key" type="password" placeholder="eyJh…"
+              style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;outline:none;font-family:monospace;">
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;">
+            <button onclick="saveSupabaseSettings()" style="background:var(--purple);color:#fff;border:none;border-radius:6px;padding:0.55rem 1.25rem;font-size:0.85rem;font-weight:600;cursor:pointer;">Save & Connect</button>
+            <span id="sb-status" style="font-size:0.78rem;color:var(--muted);">Not connected</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -912,6 +1024,334 @@ function showToast(msg) {
 /* ── INIT ─────────────────────────────────────────────────────────────── */
 populateFleetSelect();
 renderView("overview");
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SUPABASE DATA LAYER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const SB_SETTINGS_KEY = "ap3x_supabase_settings";
+let _sbClient = null;
+let _sbChannels = [];  // active realtime subscriptions
+
+/* ── Settings helpers ─────────────────────────────────────────────── */
+function getSBSettings() {
+  try {
+    const raw = localStorage.getItem(SB_SETTINGS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && s.url && s.anonKey) ? s : null;
+  } catch { return null; }
+}
+
+function saveSupabaseSettings() {
+  const url    = document.getElementById("sb-url").value.trim();
+  const anonKey= document.getElementById("sb-key").value.trim();
+  if (!url || !anonKey) { showToast("Enter both URL and anon key"); return; }
+  localStorage.setItem(SB_SETTINGS_KEY, JSON.stringify({ url, anonKey }));
+  _sbClient = null;
+  _sbChannels = [];
+  showToast("✓ Settings saved — connecting…");
+  _initSupabase();
+}
+
+/* ── Client init ──────────────────────────────────────────────────── */
+function getSBClient() {
+  if (_sbClient) return _sbClient;
+  const s = getSBSettings();
+  if (!s) return null;
+  if (typeof window.supabase === "undefined") return null;
+  _sbClient = window.supabase.createClient(s.url, s.anonKey);
+  return _sbClient;
+}
+
+async function _initSupabase() {
+  const sb = getSBClient();
+  if (!sb) {
+    const el = document.getElementById("sb-status");
+    if (el) el.textContent = "⚠ Not connected — enter credentials in Settings";
+    return;
+  }
+
+  // Test connection
+  const { error } = await sb.from("jobs").select("id", { count: "exact", head: true });
+  const el = document.getElementById("sb-status");
+  if (error) {
+    if (el) el.textContent = `✗ ${error.message}`;
+    showToast("Supabase error: " + error.message);
+    return;
+  }
+  if (el) el.textContent = "✓ Connected";
+
+  // Populate settings inputs with saved values
+  const s = getSBSettings();
+  const urlEl = document.getElementById("sb-url");
+  const keyEl = document.getElementById("sb-key");
+  if (urlEl && s) urlEl.value = s.url;
+  if (keyEl && s) keyEl.value = s.anonKey;
+
+  // Start realtime subscriptions
+  _subscribeRealtime();
+
+  // Load live data
+  await loadJobsFromSupabase();
+  await loadProfilesFromSupabase();
+  await loadVehiclesFromSupabase();
+}
+
+/* ── Realtime subscriptions ───────────────────────────────────────── */
+function _subscribeRealtime() {
+  const sb = getSBClient();
+  if (!sb) return;
+
+  // Unsubscribe previous
+  _sbChannels.forEach(ch => sb.removeChannel(ch));
+  _sbChannels = [];
+
+  // jobs
+  const jobsCh = sb.channel("rt-jobs")
+    .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => {
+      loadJobsFromSupabase();
+      if (activeView === "jobs") renderView("jobs");
+    })
+    .subscribe();
+
+  // job_assignments
+  const assignCh = sb.channel("rt-assignments")
+    .on("postgres_changes", { event: "*", schema: "public", table: "job_assignments" }, () => {
+      loadJobsFromSupabase();
+      if (activeView === "jobs") renderView("jobs");
+    })
+    .subscribe();
+
+  // telemetry
+  const telCh = sb.channel("rt-telemetry")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "telemetry" }, (payload) => {
+      _handleTelemetryUpdate(payload.new);
+    })
+    .subscribe();
+
+  // alerts
+  const alertCh = sb.channel("rt-alerts")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "alerts" }, (payload) => {
+      _handleNewAlert(payload.new);
+    })
+    .subscribe();
+
+  _sbChannels = [jobsCh, assignCh, telCh, alertCh];
+}
+
+/* ── Realtime handlers ────────────────────────────────────────────── */
+function _handleTelemetryUpdate(row) {
+  // Update driver status badge in sidebar if we track driver count
+  updateBadges();
+}
+
+function _handleNewAlert(row) {
+  showToast(`⚠ Alert: ${row.message || row.type || "New alert received"}`);
+}
+
+/* ── Live data state ──────────────────────────────────────────────── */
+let SB_JOBS        = [];   // rows from jobs table
+let SB_ASSIGNMENTS = [];   // rows from job_assignments (joined)
+let SB_PROFILES    = [];   // rows from profiles (drivers)
+let SB_VEHICLES    = [];   // rows from vehicles
+
+async function loadJobsFromSupabase() {
+  const sb = getSBClient();
+  if (!sb) return;
+
+  const { data: jobs, error: jErr } = await sb
+    .from("jobs")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (jErr) { console.error("[SB] jobs fetch error:", jErr.message); return; }
+  SB_JOBS = jobs || [];
+
+  const { data: assignments, error: aErr } = await sb
+    .from("job_assignments")
+    .select("*, jobs(title, pickup_location, dropoff_location), profiles:driver_id(full_name), vehicles:vehicle_id(registration)")
+    .order("created_at", { ascending: false });
+
+  if (aErr) { console.error("[SB] job_assignments fetch error:", aErr.message); return; }
+  SB_ASSIGNMENTS = assignments || [];
+
+  document.getElementById("badge-jobs").textContent =
+    SB_JOBS.filter(j => j.status !== "completed" && j.status !== "cancelled").length;
+
+  if (activeView === "jobs") {
+    renderJobsView();
+    updateBadges();
+  }
+}
+
+async function loadProfilesFromSupabase() {
+  const sb = getSBClient();
+  if (!sb) return;
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id, full_name, role")
+    .eq("role", "driver");
+  if (!error) SB_PROFILES = data || [];
+}
+
+async function loadVehiclesFromSupabase() {
+  const sb = getSBClient();
+  if (!sb) return;
+  const { data, error } = await sb.from("vehicles").select("id, registration, type");
+  if (!error) SB_VEHICLES = data || [];
+}
+
+/* ── Assign job ───────────────────────────────────────────────────── */
+async function assignJob() {
+  const sb = getSBClient();
+  if (!sb) { showToast("Not connected to Supabase"); return; }
+
+  const jobId    = document.getElementById("assign-job-id").value;
+  const driverId = document.getElementById("assign-driver-id").value;
+  const vehicleId= document.getElementById("assign-vehicle-id").value;
+
+  if (!jobId)    { showToast("Select a job");    return; }
+  if (!driverId) { showToast("Select a driver"); return; }
+
+  const { error } = await sb.from("job_assignments").insert({
+    job_id:    jobId,
+    driver_id: driverId,
+    vehicle_id: vehicleId || null,
+    status:    "assigned"
+  });
+
+  if (error) {
+    showToast("✗ Assignment failed: " + error.message);
+    return;
+  }
+
+  showToast("✓ Job assigned");
+  await loadJobsFromSupabase();
+  renderView("jobs");
+}
+
+/* ── Populate assignment dropdowns ────────────────────────────────── */
+function populateJobDropdowns() {
+  const jobSel  = document.getElementById("assign-job-id");
+  const drvSel  = document.getElementById("assign-driver-id");
+  const vehSel  = document.getElementById("assign-vehicle-id");
+  if (!jobSel) return;
+
+  // Unassigned jobs only
+  const assignedJobIds = new Set(SB_ASSIGNMENTS.filter(a => a.status === "assigned" || a.status === "in_progress").map(a => a.job_id));
+  const unassigned = SB_JOBS.filter(j => !assignedJobIds.has(j.id) && j.status !== "completed" && j.status !== "cancelled");
+
+  jobSel.innerHTML = '<option value="">— Select job —</option>' +
+    unassigned.map(j => `<option value="${j.id}">${j.title || j.id}</option>`).join("");
+
+  drvSel.innerHTML = '<option value="">— Select driver —</option>' +
+    SB_PROFILES.map(p => `<option value="${p.id}">${p.full_name || p.id}</option>`).join("");
+
+  vehSel.innerHTML = '<option value="">— No vehicle —</option>' +
+    SB_VEHICLES.map(v => `<option value="${v.id}">${v.registration || v.type || v.id}</option>`).join("");
+}
+
+/* ── Render Jobs view ─────────────────────────────────────────────── */
+function renderJobsView() {
+  const sb = getSBClient();
+
+  // KPIs
+  const total     = SB_JOBS.length;
+  const pending   = SB_JOBS.filter(j => j.status === "pending").length;
+  const active    = SB_JOBS.filter(j => j.status === "in_progress").length;
+  const completed = SB_JOBS.filter(j => j.status === "completed").length;
+
+  document.getElementById("kpi-jobs").innerHTML =
+    kpi("Total Jobs",  total,     "") +
+    kpi("Pending",     pending,   "awaiting assignment") +
+    kpi("In Progress", active,    "live") +
+    kpi("Completed",   completed, "");
+
+  // Populate assignment form dropdowns
+  populateJobDropdowns();
+
+  // Jobs table
+  const jobCount = document.getElementById("job-count");
+  if (jobCount) jobCount.textContent = `${total} job${total !== 1 ? "s" : ""}`;
+
+  const jobTbody = document.getElementById("job-table");
+  if (!sb) {
+    jobTbody.innerHTML = '<tr class="empty-row"><td colspan="7">⚠ Connect Supabase in Settings first.</td></tr>';
+    document.getElementById("assignment-table").innerHTML = '<tr class="empty-row"><td colspan="5">⚠ Connect Supabase in Settings first.</td></tr>';
+    return;
+  }
+
+  if (!SB_JOBS.length) {
+    jobTbody.innerHTML = '<tr class="empty-row"><td colspan="7">No active jobs.</td></tr>';
+  } else {
+    const assignedMap = {};
+    SB_ASSIGNMENTS.forEach(a => { assignedMap[a.job_id] = a; });
+
+    jobTbody.innerHTML = SB_JOBS.map(j => {
+      const asgn = assignedMap[j.id];
+      const statusClass = { pending:"unbound", assigned:"bound", in_progress:"deploying", completed:"active", rejected:"revoked", cancelled:"revoked" }[j.status] || "unbound";
+      const driverLabel = asgn?.profiles?.full_name || (asgn ? shortId(asgn.driver_id) : "—");
+      const vehicleLabel= asgn?.vehicles?.registration || (asgn?.vehicle_id ? shortId(asgn.vehicle_id) : "—");
+      return `<tr>
+        <td><strong>${j.title || "Untitled"}</strong></td>
+        <td>${j.pickup_location || "—"}</td>
+        <td>${j.dropoff_location || "—"}</td>
+        <td>${badge(j.status || "unknown", statusClass)}</td>
+        <td>${driverLabel}</td>
+        <td>${vehicleLabel}</td>
+        <td class="mono">${fmtTime(j.created_at)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Assignments table
+  const aCount = document.getElementById("assignment-count");
+  if (aCount) aCount.textContent = `${SB_ASSIGNMENTS.length}`;
+
+  const assignTbody = document.getElementById("assignment-table");
+  if (!SB_ASSIGNMENTS.length) {
+    assignTbody.innerHTML = '<tr class="empty-row"><td colspan="5">No assignments yet.</td></tr>';
+  } else {
+    assignTbody.innerHTML = SB_ASSIGNMENTS.map(a => {
+      const statusClass = { assigned:"bound", in_progress:"deploying", completed:"active", rejected:"revoked" }[a.status] || "unbound";
+      const jobTitle    = a.jobs?.title || shortId(a.job_id);
+      const driverName  = a.profiles?.full_name || shortId(a.driver_id);
+      const vehicleReg  = a.vehicles?.registration || (a.vehicle_id ? shortId(a.vehicle_id) : "—");
+      return `<tr>
+        <td><strong>${jobTitle}</strong></td>
+        <td>${driverName}</td>
+        <td>${vehicleReg}</td>
+        <td>${badge(a.status || "unknown", statusClass)}</td>
+        <td class="mono">${fmtTime(a.created_at)}</td>
+      </tr>`;
+    }).join("");
+  }
+}
+
+/* ── Wire renderView to include jobs + settings ───────────────────── */
+const _origRenderView = renderView;
+renderView = function(name) {
+  _origRenderView(name);
+  if (name === "jobs")     renderJobsView();
+  if (name === "settings") _renderSettingsView();
+};
+
+function _renderSettingsView() {
+  const s = getSBSettings();
+  const el = document.getElementById("sb-status");
+  if (el) el.textContent = s ? "✓ Credentials saved (not yet tested)" : "Not connected";
+  const urlEl = document.getElementById("sb-url");
+  const keyEl = document.getElementById("sb-key");
+  if (urlEl && s) urlEl.value = s.url;
+  if (keyEl && s) keyEl.value = s.anonKey;
+}
+
+/* ── Auto-init on load ────────────────────────────────────────────── */
+VIEW_TITLES["jobs"]     = "Jobs & Dispatch";
+VIEW_TITLES["settings"] = "Settings";
+_initSupabase();
+
 </script>
 </body>
 </html>

@@ -1,4 +1,13 @@
 // AP3X Driver PWA — App Shell (RUN 9)
+
+import {
+  getAuthUser,
+  confirmDriverRole,
+  fetchDriverAssignments,
+  updateAssignmentStatus,
+  subscribeToAssignments,
+  isSupabaseConfigured
+} from "./supabase-jobs.js";
 // ═══════════════════════════════════════════════════════════════════════════════
 // Entry point. Bootstraps the PWA:
 //   1. Registers service worker
@@ -79,6 +88,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   setTimeout(() => {
     if (splash) { splash.classList.add("hidden"); }
   }, 1200);
+  // 15. Supabase job assignments (patches into existing flow)
+  await _bootSupabaseJobs(identity);
 });
 
 // ─── SERVICE WORKER ───────────────────────────────────────────────────────────
@@ -329,4 +340,148 @@ function _showBanner(msg, color = "amber") {
   banner.textContent = msg;
   banner.className   = `offline-banner visible text-${color}`;
   setTimeout(() => { banner.classList.remove("visible"); }, 4000);
+}
+
+
+// ─── SUPABASE JOB FLOW ────────────────────────────────────────────────────────
+// Queries job_assignments for this driver and renders them into #view-route.
+// Wraps existing route viewer with a job card layer.
+// Does NOT remove existing sync agent — both coexist.
+
+async function _bootSupabaseJobs(identity) {
+  if (!isSupabaseConfigured()) {
+    // Supabase not configured — show helpful empty state, don't break existing flow
+    _renderJobEmptyState("No dispatch connection. Ask your fleet manager to configure AP3X Supabase settings.");
+    return;
+  }
+
+  try {
+    // Validate auth
+    const user = await getAuthUser();
+    if (!user) {
+      _renderJobEmptyState("Not signed in. Please log in via your fleet manager.");
+      return;
+    }
+
+    const isDriver = await confirmDriverRole(user.id);
+    if (!isDriver) {
+      _renderJobEmptyState("Account not registered as a driver. Contact your fleet manager.");
+      return;
+    }
+
+    // Use Supabase user ID as driverId going forward
+    const driverId = user.id;
+
+    // Initial fetch
+    const assignments = await fetchDriverAssignments(driverId);
+    _renderJobAssignments(assignments);
+
+    // Realtime subscription — update instantly on any change
+    subscribeToAssignments(driverId, (updated) => {
+      _renderJobAssignments(updated);
+    });
+
+  } catch (err) {
+    console.error("[SB Jobs] boot error:", err.message);
+    _renderJobEmptyState("Could not load job assignments. Check your connection.");
+  }
+}
+
+function _renderJobAssignments(assignments) {
+  const container = document.getElementById("view-route");
+  if (!container) return;
+
+  // Find or create the job board panel (inject above existing route content)
+  let jobPanel = document.getElementById("ap3x-job-board");
+  if (!jobPanel) {
+    jobPanel = document.createElement("div");
+    jobPanel.id = "ap3x-job-board";
+    jobPanel.style.cssText = "margin-bottom:12px";
+    container.prepend(jobPanel);
+  }
+
+  if (!assignments || assignments.length === 0) {
+    jobPanel.innerHTML = `
+      <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+        <div style="font-size:1.5rem;margin-bottom:0.5rem;">🚚</div>
+        <div class="card-title">Waiting for dispatch centre to assign a job</div>
+        <div class="text-muted text-sm" style="margin-top:0.4rem;">You will be notified automatically when a job is assigned.</div>
+      </div>`;
+    return;
+  }
+
+  jobPanel.innerHTML = assignments.map(a => `
+    <div class="card highlight" id="job-card-${a.assignment_id}" style="margin-bottom:10px;">
+      <div class="card-title" style="margin-bottom:0.5rem;">${_escHtml(a.title)}</div>
+      <div class="text-sm" style="display:flex;flex-direction:column;gap:6px;margin-bottom:0.75rem;">
+        <div class="flex-between">
+          <span class="text-muted">Pickup</span>
+          <span>${_escHtml(a.pickup_location)}</span>
+        </div>
+        <div class="flex-between">
+          <span class="text-muted">Dropoff</span>
+          <span>${_escHtml(a.dropoff_location)}</span>
+        </div>
+        <div class="flex-between">
+          <span class="text-muted">Status</span>
+          <span class="font-mono" style="color:${_statusColor(a.status)};text-transform:uppercase;font-size:0.75rem;">${a.status}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        ${a.status === "assigned" ? `
+          <button onclick="_jobAction('${a.assignment_id}','in_progress')"
+            style="flex:1;background:#7C3AED;color:#fff;border:none;border-radius:6px;padding:0.5rem;font-size:0.82rem;font-weight:600;cursor:pointer;">
+            ✓ Accept
+          </button>
+          <button onclick="_jobAction('${a.assignment_id}','rejected')"
+            style="flex:1;background:#7F1D1D;color:#F87171;border:none;border-radius:6px;padding:0.5rem;font-size:0.82rem;font-weight:600;cursor:pointer;">
+            ✗ Reject
+          </button>
+        ` : ""}
+        ${a.status === "in_progress" ? `
+          <button onclick="_jobAction('${a.assignment_id}','completed')"
+            style="flex:1;background:#14532D;color:#4ADE80;border:none;border-radius:6px;padding:0.5rem;font-size:0.82rem;font-weight:600;cursor:pointer;">
+            ✓ Complete Job
+          </button>
+        ` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function _jobAction(assignmentId, newStatus) {
+  const btn = document.querySelector(`#job-card-${assignmentId} button`);
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+
+  const result = await updateAssignmentStatus(assignmentId, newStatus);
+  if (result.error) {
+    _showBanner("Failed to update job: " + result.error, "red");
+    if (btn) { btn.disabled = false; btn.textContent = "Retry"; }
+  }
+  // Realtime subscription will refresh the UI automatically
+}
+
+function _renderJobEmptyState(msg) {
+  const container = document.getElementById("view-route");
+  if (!container) return;
+  let jobPanel = document.getElementById("ap3x-job-board");
+  if (!jobPanel) {
+    jobPanel = document.createElement("div");
+    jobPanel.id = "ap3x-job-board";
+    container.prepend(jobPanel);
+  }
+  jobPanel.innerHTML = `
+    <div class="card" style="text-align:center;padding:1.5rem 1rem;">
+      <div style="font-size:1.5rem;margin-bottom:0.5rem;">🚚</div>
+      <div class="text-muted text-sm">${_escHtml(msg)}</div>
+    </div>`;
+}
+
+function _statusColor(status) {
+  const map = { assigned: "#60A5FA", in_progress: "#FBBF24", completed: "#4ADE80", rejected: "#F87171" };
+  return map[status] || "#94A3B8";
+}
+
+function _escHtml(str) {
+  return String(str || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
